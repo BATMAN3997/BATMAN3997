@@ -1,0 +1,78 @@
+# Этот рабочий процесс будет создавать и переводить приложение node.js в веб-приложение Azure, когда коммит будет перенаправлен в ветку по умолчанию.
+#
+# Этот рабочий процесс предполагает, что вы уже создали целевое веб-приложение Azure App Service.
+# Инструкции см. В https://docs.microsoft.com/en-us/azure/app-service/quickstart-nodejs?tabs=linux&pivots=development-environment-cli
+#
+# Чтобы настроить этот рабочий процесс:
+#
+# № 1. Загрузите профиль публикации для своего веб-приложения Azure. Вы можете скачать этот файл со страницы обзора вашего веб-приложения на портале Azure.
+#    Для получения дополнительной информации: https://docs.microsoft.com/en-us/azure/app-service/deploy-github-actions?tabs=applevel#generate-deployment-credentials
+#
+# № 2. Создайте секрет в своем хранилище с именем AZURE_WEBAPP_PUBLISH_PROFILE, вставьте содержимое профиля публикации в качестве значения секрета.
+#    Инструкции по получению профиля публикации см .: https://docs.microsoft.com/azure/app-service/deploy-github-actions#configure-the-github-secret
+#
+# № 3. Измените значение для AZURE_WEBAPP_NAME. При желании измените переменные среды AZURE_WEBAPP_PACKAGE_PATH и NODE_VERSION ниже.
+#
+# Для получения дополнительной информации о действиях GitHub для Azure: https://github.com/Azure/Actions
+# Для получения дополнительной информации о действии развертывания веб-приложений Azure: https://github.com/Azure/webapps-deploy
+# Для запуска большего количества образцов с рабочими процессами GitHub Action для развертывания в Azure: https://github.com/Azure/actions-workflow-samples
+
+на:
+  толкать:
+    филиалы: [ «основной» ]
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: имя вашего приложения # установите это на имя вашего приложения
+  AZURE_WEBAPP_PACKAGE_PATH: '.' # установите для этого путь к проекту веб-приложения, по умолчанию используется корень хранилища
+  NODE_VERSION: '14.x' # установите это для версии узла, чтобы использовать
+
+разрешения:
+  содержание: читать
+
+рабочие места:
+  построить:
+    работает: Ubuntu-Latest
+    шаги:
+    - использует: действия / checkout @ v3
+
+    - имя: настроить Node.js
+      использует: actions / setup-node @ v3
+      с:
+        узел-версия: $ { { env.NODE_VERSION } }
+        кеш: 'npm'
+
+    - имя: npm установить, построить и протестировать
+      запустить: |
+        установить в минуту
+        npm запустить сборку --if-настоящее время
+        npm запустить тест --if-настоящее время
+
+    - имя: Загрузить артефакт для задания развертывания
+      использует: действия / upload-artifact @ v3
+      с:
+        имя: узел-приложение
+        путь: .
+
+  развернуть:
+    разрешения:
+      содержание: нет
+    работает: Ubuntu-Latest
+    потребности: построить
+    окружающая среда:
+      название: «Развитие»'
+      url: $ { { steps.deploy-to-webapp.outputs.webapp-url } }
+
+    шаги:
+    - имя: скачать артефакт из сборки работы
+      использует: действия / скачать-artifact@ v3
+      с:
+        имя: узел-приложение
+
+    - имя: «Переверните в Azure WebApp»'
+      id: развернуть в веб-приложение
+      использует: лазурь / webapps-deploy @ v2
+      с:
+        имя приложения: $ { { env.AZURE_WEBAPP_NAME } }
+        publish-profile: $ { secrets.AZURE_WEBAPP_PUBLISH_PROFILE { }
+        пакет: $ { { env.AZURE_WEBAPP_PACKAGE_PATH } }
